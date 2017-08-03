@@ -501,7 +501,7 @@
             this.textBoxExpectedChipID.Name = "textBoxExpectedChipID";
             this.textBoxExpectedChipID.Size = new System.Drawing.Size(122, 24);
             this.textBoxExpectedChipID.TabIndex = 9;
-            this.textBoxExpectedChipID.Text = "29a70ee0";
+            this.textBoxExpectedChipID.Text = "289b09e0";
             // 
             // label3
             // 

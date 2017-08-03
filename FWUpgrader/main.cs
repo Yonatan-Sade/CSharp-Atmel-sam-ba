@@ -119,8 +119,8 @@ namespace FWUpgrader
                                 Int16 crc16 = calcCrc(currentData);
                                 byte[] fullCurrentPacket = new byte[133];
                                 fullCurrentPacket[0] = 1;
-                                fullCurrentPacket[1] = packetNumber;
-                                fullCurrentPacket[2] = (byte)(255 - packetNumber);
+                                //fullCurrentPacket[1] = packetNumber;
+                                //fullCurrentPacket[2] = (byte)(255 - packetNumber);
                                 Array.Copy(currentData, 0, fullCurrentPacket, 3, 128);
                                 fullCurrentPacket[131] = (byte)(crc16 >> 8 & 0xFF);
                                 fullCurrentPacket[132] = (byte)(crc16 & 0xFF);
@@ -203,12 +203,12 @@ namespace FWUpgrader
                 if (fileToSendBytesList.Count >= bufferSize / 128)
                 {
                     currentChunk = fileToSendBytesList.Take(bufferSize / 128).ToList();
-                    fileToSendBytesList.RemoveRange(0, bufferSize / 128);
+                    //fileToSendBytesList.RemoveRange(0, bufferSize / 128);
                 }
                 else
                 {
                     currentChunk = fileToSendBytesList.Take(fileToSendBytesList.Count).ToList();
-                    fileToSendBytesList.RemoveRange(0, fileToSendBytesList.Count);
+                    //fileToSendBytesList.RemoveRange(0, fileToSendBytesList.Count);
                 }
 
                 SendFile(textBoxBufferAddress.Text, textBoxBufferSize.Text, currentChunk);
@@ -232,7 +232,10 @@ namespace FWUpgrader
                 SendSerialByString(GenerateCommandReadInt(textBoxARGV0Address.Text));
                 textBoxNumberOfBytesWrote.Text = textBoxReceivedData.Text;
 
-                writeOffset += bufferSize;
+                Int32 bytesWrote = Convert.ToInt32(textBoxNumberOfBytesWrote.Text, 16);
+                fileToSendBytesList.RemoveRange(0, bytesWrote / 128);
+                writeOffset += bytesWrote;
+
             }
             SetReady();
         }
@@ -318,13 +321,17 @@ namespace FWUpgrader
         private void buttonRead_Click(object sender, EventArgs e)
         {
             SetBusy();
+            binaryImageRead = new byte[0];
             Int32 bufferSize = Convert.ToInt32(textBoxBufferSize.Text, 16);
+            Int32 totalNumOfBytesToRead = binaryImageSent.Length;
             Int32 ReadOffset = 0;
             while (binaryImageRead.Length < binaryImageSent.Length) //Each iteration read only chunk from SRAM
             {
+                Int32 numOfBytesToRead = Math.Min(totalNumOfBytesToRead - ReadOffset, bufferSize);
+
                 SendSerialByString(GenerateCommandWriteInt(textBoxMailboxAddress.Text, appletCommandRead), false);
                 SendSerialByString(GenerateCommandWriteInt(textBoxARGV0Address.Text, textBoxBufferAddress.Text), false);
-                SendSerialByString(GenerateCommandWriteInt(textBoxARGV1Address.Text, textBoxBufferSize.Text), false);
+                SendSerialByString(GenerateCommandWriteInt(textBoxARGV1Address.Text, numOfBytesToRead.ToString("X8")), false);
                 SendSerialByString(GenerateCommandWriteInt(textBoxARGV2Address.Text, ReadOffset.ToString("X8")), false);
                 SendSerialByString(GenerateCommandGo(textBoxAppletAddress.Text), false);
                 System.Threading.Thread.Sleep(TIMEOUT_GO_READ);
@@ -339,8 +346,8 @@ namespace FWUpgrader
                     MessageBox.Show("ERROR: applet status is not equal to 0");
                 }
 
-                binaryImageRead = binaryImageRead.Concat(ReadFile(textBoxBufferAddress.Text, textBoxBufferSize.Text)).ToArray();
-                ReadOffset += bufferSize;
+                binaryImageRead = binaryImageRead.Concat(ReadFile(textBoxBufferAddress.Text, numOfBytesToRead.ToString("X8"))).ToArray();
+                ReadOffset += numOfBytesToRead;
             }
 
             binaryImageRead = binaryImageRead.Take(binaryImageSent.Length).ToArray();
@@ -350,6 +357,7 @@ namespace FWUpgrader
         /* Compare Read data and sent data to make sure flash is not corrupted: */
         private void buttonCompare_Click(object sender, EventArgs e)
         {
+
             SetBusy();
             if (binaryImageRead.SequenceEqual(binaryImageSent) == false)
             {
@@ -389,6 +397,9 @@ namespace FWUpgrader
 
             for (Int32 i = 0; i < file.Count; i++)
             {
+                file[i][1] = (byte)(i + 1);
+                file[i][2] = (byte)(255 - (byte)(i + 1));
+
                 SendSerialByBytes(file[i]);
 
                 if (textBoxReceivedData.Text != "06")
@@ -413,7 +424,7 @@ namespace FWUpgrader
 
             byte[] receivedData = new byte[0];
 
-            while (receivedData.Length < Convert.ToInt32(textBoxBufferSize.Text, 16))
+            while (receivedData.Length < Convert.ToInt32(bufferSize, 16))
             {
                 byte[] fullPacket = ReadSerial(133);
                 byte[] onlyData = new byte[128];
